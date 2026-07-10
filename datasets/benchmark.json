@@ -1,0 +1,107 @@
+[
+  {
+    "id": 1,
+    "prompt": "What is the capital of Australia?",
+    "expected": "Canberra",
+    "category": "general",
+    "difficulty": "easy"
+  },
+  {
+    "id": 2,
+    "prompt": "Who wrote the play Romeo and Juliet?",
+    "expected": "Shakespeare",
+    "category": "general",
+    "difficulty": "easy"
+  },
+  {
+    "id": 3,
+    "prompt": "What is 144 divided by 12?",
+    "expected": "12",
+    "category": "mathematics",
+    "difficulty": "easy"
+  },
+  {
+    "id": 4,
+    "prompt": "Solve for x: 3x + 9 = 27",
+    "expected": "6",
+    "category": "mathematics",
+    "difficulty": "medium"
+  },
+  {
+    "id": 5,
+    "prompt": "Calculate the sum of the first 10 natural numbers.",
+    "expected": "55",
+    "category": "mathematics",
+    "difficulty": "medium"
+  },
+  {
+    "id": 6,
+    "prompt": "Write a Python function that takes a list and returns it reversed.",
+    "expected": "def reverse_list(lst):\n    return lst[::-1]",
+    "category": "programming",
+    "difficulty": "easy"
+  },
+  {
+    "id": 7,
+    "prompt": "Write a Python function to check if a string is a palindrome.",
+    "expected": "def is_palindrome(s):\n    return s == s[::-1]",
+    "category": "programming",
+    "difficulty": "medium"
+  },
+  {
+    "id": 8,
+    "prompt": "Classify the following sentiment: 'This product is terrible, I want a refund.'",
+    "expected": "negative",
+    "category": "classification",
+    "difficulty": "easy"
+  },
+  {
+    "id": 9,
+    "prompt": "Classify the following sentiment: 'The service was okay, nothing special.'",
+    "expected": "neutral",
+    "category": "classification",
+    "difficulty": "medium"
+  },
+  {
+    "id": 10,
+    "prompt": "What does CPU stand for?",
+    "expected": "Central Processing Unit",
+    "category": "general",
+    "difficulty": "easy"
+  },
+  {
+    "id": 11,
+    "prompt": "Summarize machine learning in one sentence.",
+    "expected": "Machine learning is a field of AI that enables systems to learn and improve from experience without being explicitly programmed.",
+    "category": "summarization",
+    "difficulty": "medium"
+  },
+  {
+    "id": 12,
+    "prompt": "Summarize the purpose of an operating system in one sentence.",
+    "expected": "An operating system manages hardware and software resources and provides common services for computer programs.",
+    "category": "summarization",
+    "difficulty": "medium"
+  },
+  {
+    "id": 13,
+    "prompt": "What is the time complexity of binary search?",
+    "expected": "O(log n)",
+    "category": "programming",
+    "difficulty": "medium"
+  },
+  {
+    "id": 14,
+    "prompt": "What programming language is commonly used for data science and machine learning?",
+    "expected": "Python",
+    "category": "general",
+    "difficulty": "easy"
+  },
+  {
+    "id": 15,
+    "prompt": "What is the chemical formula for water?",
+    "expected": "H2O",
+    "category": "general",
+    "difficulty": "easy"
+  }
+]

@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Local dev / test artefacts
+.env
+.env.*
+reports/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Harness I/O directories — injected at runtime by the judging harness.
+# Do NOT bake input/output into the image; the harness mounts them as volumes.
+input/
+output/
+
+# Local model weights — downloaded at build time inside Docker, not from host.
+# Avoids accidentally copying a local copy (if it exists) into the image,
+# which would create a duplicate 1.6 GB layer.
+models/
+
+# Git
+.git/
+.gitignore
+.gitkeep
+
+# Docs / spec
+spec/
+*.md
+!README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp

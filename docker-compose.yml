@@ -1,0 +1,14 @@
+services:
+  router:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      # Config and datasets (read-only)
+      - ./config.yaml:/app/config.yaml:ro
+      - ./datasets:/app/datasets:ro
+      # Evaluation harness I/O (mounted by judge harness at runtime)
+      - ./input:/input
+      - ./output:/output

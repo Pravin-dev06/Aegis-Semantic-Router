@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project runtime & test artefacts
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+reports/
+
+# Hackathon spec documents (private competition materials)
+spec/
+
+# Local model weights — large binary files, downloaded at build time
+models/
+*.gguf
+
+# Harness I/O — injected at runtime by the judging harness
+input/
+output/

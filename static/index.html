@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMD Adaptive AI Router Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <span class="brand-text">AMD ADAPTIVE <span class="highlight">AI ROUTER</span></span>
+                <span class="badge">Track 1</span>
+            </div>
+            <div class="status-indicator">
+                <span class="pulse-dot"></span>
+                <span class="status-label">System Active</span>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Content -->
+        <main class="dashboard-grid">
+            <!-- Left Panel: Configuration & Routing Request -->
+            <section class="card control-panel">
+                <h2>Router Controller</h2>
+                
+                <div class="config-summary">
+                    <div class="model-info">
+                        <div class="info-label">LOCAL MODEL</div>
+                        <div class="info-value" id="local-model-name">Loading...</div>
+                    </div>
+                    <div class="model-info">
+                        <div class="info-label">REMOTE MODEL</div>
+                        <div class="info-value" id="remote-model-name">Loading...</div>
+                    </div>
+                </div>
+
+                <form id="routing-form">
+                    <div class="form-group">
+                        <label for="prompt-input">Enter User Prompt</label>
+                        <textarea id="prompt-input" placeholder="Type or paste a prompt here... (e.g. Write a Python function to solve an equation...)" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="slider-header">
+                            <label for="threshold-slider">Complexity Threshold</label>
+                            <span id="threshold-val">0.50</span>
+                        </div>
+                        <input type="range" id="threshold-slider" min="0" max="1" step="0.05" value="0.50">
+                        <div class="slider-labels">
+                            <span>Prefer Local</span>
+                            <span>Prefer Remote</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submit-btn">
+                        <span class="btn-text">Route Request</span>
+                        <div class="loader" id="btn-loader"></div>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Right Panel: Real-time Routing Metrics & Response -->
+            <section class="card output-panel">
+                <h2>Routing Output</h2>
+                
+                <div class="placeholder-message" id="output-placeholder">
+                    <div class="placeholder-icon">⇄</div>
+                    <p>Enter a prompt and click "Route Request" to see decision analysis.</p>
+                </div>
+
+                <div class="metrics-grid hidden" id="metrics-container">
+                    <!-- Provider Metric -->
+                    <div class="metric-card" id="provider-metric">
+                        <div class="metric-header">PROVIDER SELECTED</div>
+                        <div class="metric-value highlight" id="route-provider">-</div>
+                        <div class="metric-footer" id="route-model">-</div>
+                    </div>
+
+                    <!-- Complexity Gauge -->
+                    <div class="metric-card">
+                        <div class="metric-header">COMPLEXITY SCORE</div>
+                        <div class="score-display">
+                            <span class="metric-value" id="route-score">0.00</span>
+                            <span class="score-max">/ 1.00</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar" id="score-progress" style="width: 0%;"></div>
+                        </div>
+                        <div class="metric-footer" id="route-reason">-</div>
+                    </div>
+
+                    <!-- Latency Metric -->
+                    <div class="metric-card">
+                        <div class="metric-header">RESPONSE LATENCY</div>
+                        <div class="metric-value" id="route-latency">0.000s</div>
+                        <div class="metric-footer" id="route-fallback">No Fallback</div>
+                    </div>
+                </div>
+
+                <!-- Text Terminal for completions -->
+                <div class="terminal-container hidden" id="terminal-container">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <span class="terminal-title">Model Response</span>
+                    </div>
+                    <pre class="terminal-body" id="completion-text"></pre>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <p>Built for the AMD Developer Hackathon Track 1 • Powered by AsyncOpenAI</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

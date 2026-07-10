@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "prompt": "What is the capital of France?",
+    "expected": "Paris",
+    "category": "general"
+  },
+  {
+    "id": 2,
+    "prompt": "Write a Python function that returns the factorial of a number.",
+    "expected": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)",
+    "category": "programming"
+  },
+  {
+    "id": 3,
+    "prompt": "What is 15 * 23?",
+    "expected": "345",
+    "category": "mathematics"
+  },
+  {
+    "id": 4,
+    "prompt": "Summarize the concept of photosynthesis in one sentence.",
+    "expected": "Photosynthesis is the process by which plants convert sunlight, water, and carbon dioxide into glucose and oxygen.",
+    "category": "summarization"
+  },
+  {
+    "id": 5,
+    "prompt": "Classify the following sentiment: 'I absolutely loved this movie!'",
+    "expected": "positive",
+    "category": "classification"
+  }
+]

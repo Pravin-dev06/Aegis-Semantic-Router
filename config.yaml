@@ -1,0 +1,31 @@
+# AMD AI Router Configuration
+# All configurable values live here. Secrets belong in .env.
+
+local_provider:
+  base_url: "http://localhost:1234/v1"
+  model: "models/gemma-2-2b-it-Q4_K_M.gguf"
+  timeout: 30
+
+remote_provider:
+  base_url: "https://api.fireworks.ai/inference/v1"
+  model: "gemma-4-31b"
+  timeout: 60
+
+routing:
+  threshold: 0.5           # Global fallback threshold
+  max_remote_tokens: 4096
+  fallback_enabled: true
+  strategy: semantic        # Options: heuristic | semantic | gatekeeper (stub)
+
+  # Per-category thresholds — tuned for the semantic kNN scorer.
+  # With k=7, possible scores are: 0/7=0.0, 1/7≈0.14, 2/7≈0.29, 3/7≈0.43,
+  # 4/7≈0.57, 5/7≈0.71, 6/7≈0.86, 7/7=1.0
+  # Threshold falls between two neighbouring vote fractions.
+  category_thresholds:
+    mathematics: 0.35       # needs ≥4/7 remote votes → escalate on complex maths
+    programming: 0.35       # needs ≥4/7 remote votes → escalate on real code tasks
+    logical_reasoning: 0.35 # needs ≥4/7 remote votes → escalate on constraint puzzles
+    summarization: 0.55     # needs ≥5/7 remote votes → trust local for most summaries
+    classification: 0.55    # needs ≥5/7 remote votes → trust local for sentiment
+    ner: 0.55               # needs ≥5/7 remote votes → trust local for simple NER
+    general: 0.43           # global midpoint — balanced default

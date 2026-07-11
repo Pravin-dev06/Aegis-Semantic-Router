@@ -70,10 +70,10 @@ class LocalProvider:
         self._llama_lock = threading.Lock()
 
         # Resolve model path: if config.model is overridden by ALLOWED_MODELS (e.g. accounts/fireworks/...)
-        # but the local GGUF file is baked into the image at models/gemma-2-2b-it-Q4_K_M.gguf,
+        # but the local GGUF file is baked into the image at models/qwen2.5-3b-instruct-q4_k_m.gguf,
         # we must use the local GGUF file to guarantee local in-process execution.
         model_path = config.model
-        default_gguf = "models/gemma-2-2b-it-Q4_K_M.gguf"
+        default_gguf = "models/qwen2.5-3b-instruct-q4_k_m.gguf"
         
         if not os.path.exists(model_path):
             # Check if default GGUF or any GGUF exists in models/
@@ -118,17 +118,16 @@ class LocalProvider:
             # Run in-process Llama inference in a threadpool to prevent blocking the event loop
             loop = asyncio.get_running_loop()
             
-            # Format using the official Gemma 2 IT chat template.
-            # System instruction goes BEFORE the first user turn using a <start_of_turn>user block.
-            # This is the correct Gemma 2 format per official HuggingFace docs.
+            # Format using the official Qwen 2.5 ChatML chat template.
             system_prompt = (
                 "You are a highly precise, direct, and concise assistant. "
                 "Provide answers directly without conversational preamble or verbose explanation. "
                 "For classification or extraction tasks, output ONLY the final answer (e.g. 'positive', 'negative', 'neutral')."
             )
             formatted_prompt = (
-                f"<start_of_turn>user\n{system_prompt}\n\n{prompt}<end_of_turn>\n"
-                f"<start_of_turn>model\n"
+                f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
+                f"<|im_start|>user\n{prompt}<|im_end|>\n"
+                f"<|im_start|>assistant\n"
             )
             
             def _inference():
@@ -138,7 +137,7 @@ class LocalProvider:
                         formatted_prompt,
                         max_tokens=512,
                         temperature=0.1,
-                        stop=["<end_of_turn>", "<start_of_turn>"],
+                        stop=["<|im_end|>", "<|im_start|>"],
                     )
                 
             response = await loop.run_in_executor(None, _inference)

@@ -3,7 +3,7 @@
 
 local_provider:
   base_url: "http://localhost:1234/v1"
-  model: "models/gemma-2-2b-it-Q4_K_M.gguf"
+  model: "models/qwen2.5-3b-instruct-q4_k_m.gguf"
   timeout: 30
 
 remote_provider:
@@ -15,17 +15,17 @@ routing:
   threshold: 0.5           # Global fallback threshold
   max_remote_tokens: 4096
   fallback_enabled: true
-  strategy: semantic        # Options: heuristic | semantic | gatekeeper (stub)
+  strategy: heuristic        # Options: heuristic | semantic | gatekeeper (stub)
 
-  # Per-category thresholds — tuned for the semantic kNN scorer.
-  # With k=7, possible scores are: 0/7=0.0, 1/7≈0.14, 2/7≈0.29, 3/7≈0.43,
-  # 4/7≈0.57, 5/7≈0.71, 6/7≈0.86, 7/7=1.0
-  # Threshold falls between two neighbouring vote fractions.
+  # Per-category thresholds for the heuristic scorer.
+  # Score range is 0.0 to 1.0 based on length, code, math, and reasoning signals.
+  # Threshold <= 0.10 forces the category to Remote (since math/code signals add 0.30/0.40).
+  # Threshold >= 0.55 keeps the category Local unless the prompt is extremely long or complex.
   category_thresholds:
-    mathematics: 0.35       # needs ≥4/7 remote votes → escalate on complex maths
-    programming: 0.35       # needs ≥4/7 remote votes → escalate on real code tasks
-    logical_reasoning: 0.35 # needs ≥4/7 remote votes → escalate on constraint puzzles
-    summarization: 0.55     # needs ≥5/7 remote votes → trust local for most summaries
-    classification: 0.55    # needs ≥5/7 remote votes → trust local for sentiment
-    ner: 0.55               # needs ≥5/7 remote votes → trust local for simple NER
-    general: 0.43           # global midpoint — balanced default
+    mathematics: 0.10        # Force mathematics to Remote (high accuracy)
+    programming: 0.10        # Force programming/code to Remote (high accuracy)
+    logical_reasoning: 0.10  # Force logical reasoning to Remote (high accuracy)
+    summarization: 0.55      # Keep summarisation Local (cost-effective)
+    classification: 0.55     # Keep classification/sentiment Local (cost-effective)
+    ner: 0.55                # Keep NER Local (cost-effective)
+    general: 0.40            # Midpoint for general queries

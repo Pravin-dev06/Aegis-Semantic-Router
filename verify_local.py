@@ -50,7 +50,7 @@ def install_dependencies():
 
 def check_models():
     model_dir = Path("models")
-    model_path = model_dir / "gemma-2-2b-it-Q4_K_M.gguf"
+    model_path = model_dir / "qwen2.5-3b-instruct-q4_k_m.gguf"
     
     if not model_dir.exists():
         model_dir.mkdir(parents=True, exist_ok=True)
@@ -60,10 +60,10 @@ def check_models():
         print_status(f"Local model found at {model_path} ({size_gb:.2f} GB).", "SUCCESS")
         return True
         
-    print_status("Local Gemma 2 2B GGUF model is missing from models/ folder.", "WARNING")
-    url = "https://huggingface.co/lmstudio-community/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf"
+    print_status("Local Qwen 2.5 3B GGUF model is missing from models/ folder.", "WARNING")
+    url = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
     
-    choice = input("Would you like to download the Gemma 2 2B model (~1.6 GB) now? (y/n): ").strip().lower()
+    choice = input("Would you like to download the Qwen 2.5 3B model (~2.0 GB) now? (y/n): ").strip().lower()
     if choice == 'y':
         print_status(f"Downloading model from HuggingFace to {model_path}...")
         print_status("This may take several minutes depending on your internet connection...", "INFO")
@@ -99,9 +99,9 @@ def test_local_model_inference():
     """
     print_status("Testing local in-process GGUF inference (simulating ALLOWED_MODELS override)...")
 
-    model_path = Path("models") / "gemma-2-2b-it-Q4_K_M.gguf"
+    model_path = Path("models") / "qwen2.5-3b-instruct-q4_k_m.gguf"
     if not model_path.exists():
-        print_status("GGUF model not found at models/gemma-2-2b-it-Q4_K_M.gguf — skipping GGUF test.", "WARNING")
+        print_status("GGUF model not found at models/qwen2.5-3b-instruct-q4_k_m.gguf — skipping GGUF test.", "WARNING")
         return False
 
     try:

@@ -1,8 +1,4 @@
-# Aegis Semantic Router
-
-> **A zero-token local-first hybrid AI agent gateway for the AMD Developer Hackathon ACT II — Track 1: General-Purpose AI Agent.**
-
-Aegis intelligently routes natural language queries between a fully **in-process local Gemma-2-2B-Instruct model** (zero API cost) and a premium **Fireworks AI** cloud model. The routing decision is made by a CPU-only semantic kNN classifier that compares incoming prompts against a curated reference corpus covering all 8 hackathon evaluation categories.
+Aegis intelligently routes natural language queries between a fully **in-process local Qwen-2.5-3B-Instruct model** (zero API cost) and a premium **Fireworks AI** cloud model. The routing decision is made by a CPU-only heuristic classifier that analyzes prompt length, syntax structure, and category keywords.
 
 The result: **maximum accuracy at minimum Fireworks token spend**.
 
@@ -31,10 +27,10 @@ The result: **maximum accuracy at minimum Fireworks token spend**.
 
 | Property | Value |
 |---|---|
-| **Local Model** | `gemma-2-2b-it-Q4_K_M.gguf` (in-process via `llama-cpp-python`) |
+| **Local Model** | `qwen2.5-3b-instruct-q4_k_m.gguf` (in-process via `llama-cpp-python`) |
 | **Router Model** | `all-MiniLM-L6-v2` (Hugging Face, CPU-only, ~100 MB) |
 | **Remote Provider** | Fireworks AI (env-configurable via `ALLOWED_MODELS`) |
-| **Routing Strategy** | Semantic kNN (k=7) cosine similarity |
+| **Routing Strategy** | Heuristic (Active) / Semantic kNN (Configurable) |
 | **Reference Corpus** | 40 prompts — 5 local + 5 remote × 8 hackathon categories |
 | **RAM Usage** | ~2.5 GB peak (fits within judging VM's 4 GB limit) |
 | **Container Startup** | < 15 seconds (all model weights pre-baked at build time) |
@@ -71,7 +67,7 @@ The result: **maximum accuracy at minimum Fireworks token spend**.
                ▼                                             ▼
   ┌────────────────────────┐                   ┌────────────────────────┐
   │    Local Provider       │                   │    Remote Provider      │
-  │  gemma-2-2b-it Q4_K_M  │                   │    Fireworks AI API     │
+  │ qwen2.5-3b-instruct Q4  │                   │    Fireworks AI API     │
   │  llama-cpp-python       │                   │  (from ALLOWED_MODELS)  │
   │  Cost: 0 tokens ✅      │                   │  Cost: counted tokens   │
   └────────────┬───────────┘                   └────────────────────────┘
@@ -91,14 +87,14 @@ The semantic router is tuned to handle all 8 official hackathon evaluation categ
 
 | # | Category | Default Route | Threshold | Reason |
 |---|---|---|---|---|
-| 1 | Factual Knowledge | **Local** | 0.43 | Simple recall — Gemma 2B handles well |
-| 2 | Mathematical Reasoning | **Remote** | 0.35 | Multi-step arithmetic needs precision |
-| 3 | Sentiment Classification | **Local** | 0.55 | Gemma 2B excels at basic classification |
-| 4 | Text Summarisation | **Local** | 0.55 | Condensing is well within 2B capability |
+| 1 | Factual Knowledge | **Local** | 0.40 | Simple recall — Qwen 3B handles well |
+| 2 | Mathematical Reasoning | **Remote** | 0.10 | Multi-step math escalated to Fireworks |
+| 3 | Sentiment Classification | **Local** | 0.55 | Qwen 3B excels at aspect-based sentiment |
+| 4 | Text Summarisation | **Local** | 0.55 | Summarisation stays local |
 | 5 | Named Entity Recognition | **Local** | 0.55 | Structured extraction stays local |
-| 6 | Code Debugging | **Remote** | 0.35 | Subtle bugs need deep reasoning |
-| 7 | Logical / Deductive Reasoning | **Remote** | 0.35 | Constraint puzzles need stronger models |
-| 8 | Code Generation | **Remote** | 0.35 | Correctness matters — remote wins |
+| 6 | Code Debugging | **Remote** | 0.10 | Complex code logic handled remotely |
+| 7 | Logical / Deductive Reasoning | **Remote** | 0.10 | Multi-constraint logic escalated |
+| 8 | Code Generation | **Remote** | 0.10 | Code generation handled remotely |
 
 ---
 
@@ -108,7 +104,7 @@ The router uses a **cosine similarity kNN classifier** with k=7 to decide whethe
 
 ### Reference Corpus
 A balanced corpus of **40 reference prompts** is hand-curated:
-- **5 "local" examples** per category: simple, single-step queries well within the capability of Gemma-2-2B.
+- **5 "local" examples** per category: simple, single-step queries well within the capability of Qwen 2.5 3B.
 - **5 "remote" examples** per category: complex, multi-step queries that require a stronger model.
 
 ### Scoring
@@ -199,7 +195,7 @@ CONGRATULATIONS! Your local router setup is fully verified and clean.
 The Docker build automatically:
 1. Installs all CPU-optimised Python dependencies (no CUDA).
 2. Downloads and bakes `all-MiniLM-L6-v2` (router model, ~100 MB) into the image.
-3. Downloads and bakes `gemma-2-2b-it-Q4_K_M.gguf` (local inference model, ~1.6 GB) into the image.
+3. Downloads and bakes `qwen2.5-3b-instruct-q4_k_m.gguf` (local inference model, ~2.0 GB) into the image.
 4. Sets `TRANSFORMERS_OFFLINE=1` so the container runs with **zero runtime internet access**.
 
 ```bash
@@ -294,7 +290,7 @@ All non-secret settings live in `config.yaml`. Secrets (API keys) are passed via
 ```yaml
 local_provider:
   base_url: "http://localhost:1234/v1"   # Only used in local dev without llama-cpp
-  model: "models/gemma-2-2b-it-Q4_K_M.gguf"
+  model: "models/qwen2.5-3b-instruct-q4_k_m.gguf"
   timeout: 30
 
 remote_provider:

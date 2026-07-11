@@ -31,16 +31,16 @@ print(f'Router model ready. Embedding dim: {m.get_sentence_embedding_dimension()
 "
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 4: Bake the LOCAL INFERENCE model into the image (~1.6 GB).
+# Stage 4: Bake the LOCAL INFERENCE model into the image (~2.0 GB).
 #
-# gemma-2-2b-it-Q4_K_M.gguf runs via llama-cpp-python entirely in-process.
+# qwen2.5-3b-instruct-q4_k_m.gguf runs via llama-cpp-python entirely in-process.
 # Local answers count fully toward accuracy and cost 0 Fireworks tokens.
 # Fits comfortably within the 4 GB RAM / 2 vCPU grading environment.
 # ─────────────────────────────────────────────────────────────────────────────
 RUN mkdir -p /app/models \
     && wget -q --show-progress \
-       -O /app/models/gemma-2-2b-it-Q4_K_M.gguf \
-       https://huggingface.co/lmstudio-community/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf
+       -O /app/models/qwen2.5-3b-instruct-q4_k_m.gguf \
+       https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf
 
 # Remove wget now that all downloads are complete
 RUN apt-get purge -y wget && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*

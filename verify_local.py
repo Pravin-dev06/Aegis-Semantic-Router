@@ -90,6 +90,79 @@ def check_models():
         print_status("Skipping model download. Local in-process runs will fall back to the HTTP endpoint.", "INFO")
         return True
 
+def test_local_model_inference():
+    """Directly verify that LocalProvider loads and runs the GGUF model.
+
+    This test simulates the EXACT judging environment by setting ALLOWED_MODELS
+    to the Fireworks string — the same override the judge injects. It then checks
+    that LocalProvider still finds and loads the baked-in GGUF file (not the API).
+    """
+    print_status("Testing local in-process GGUF inference (simulating ALLOWED_MODELS override)...")
+
+    model_path = Path("models") / "gemma-2-2b-it-Q4_K_M.gguf"
+    if not model_path.exists():
+        print_status("GGUF model not found at models/gemma-2-2b-it-Q4_K_M.gguf — skipping GGUF test.", "WARNING")
+        return False
+
+    try:
+        # Temporarily override env to mimic the judging harness
+        _orig_allowed = os.environ.get("ALLOWED_MODELS")
+        _orig_base_url = os.environ.get("FIREWORKS_BASE_URL")
+        _orig_api_key  = os.environ.get("FIREWORKS_API_KEY")
+
+        os.environ["ALLOWED_MODELS"] = "accounts/fireworks/models/gemma2-2b-it,accounts/fireworks/models/gemma2-27b-it"
+        os.environ["FIREWORKS_BASE_URL"] = "https://api.fireworks.ai/inference/v1"
+        os.environ["FIREWORKS_API_KEY"] = _orig_api_key or "dummy-test-key"
+
+        from config import load_config, ProviderConfig
+        from providers import LocalProvider
+
+        # Reload config with the injected env vars — mirrors what the container does on startup
+        config = load_config()
+        print_status(f"Config loaded: local model string = '{config.local_provider.model}'")
+
+        # Create LocalProvider — it must find the GGUF even with ALLOWED_MODELS overriding config.model
+        local = LocalProvider(config.local_provider)
+
+        if local.in_process_model is None:
+            print_status("CRITICAL: LocalProvider did NOT load the GGUF model! It fell back to HTTP API.", "ERROR")
+            print_status("This means ALL local queries will hit the Fireworks API and will fail during judging.", "ERROR")
+            return False
+
+        print_status("LocalProvider loaded the GGUF model successfully.", "SUCCESS")
+
+        # Run a real inference call to verify the model generates output
+        import asyncio
+        async def _test():
+            return await local.generate("What is the capital of France? Reply in one word.")
+
+        result = asyncio.run(_test())
+
+        if result.content and len(result.content.strip()) > 0:
+            print_status(f"GGUF inference successful! Response: '{result.content.strip()}'", "SUCCESS")
+            return True
+        else:
+            print_status("GGUF inference returned an empty response.", "ERROR")
+            return False
+
+    except Exception as e:
+        print_status(f"Local model inference test failed with exception: {e}", "ERROR")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    finally:
+        # Restore original env vars so Phase 1 unit tests run in a clean environment
+        for key, orig in [("ALLOWED_MODELS", _orig_allowed), ("FIREWORKS_BASE_URL", _orig_base_url), ("FIREWORKS_API_KEY", _orig_api_key)]:
+            if orig is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = orig
+        # Evict cached config module so tests re-read a clean environment
+        import sys as _sys
+        _sys.modules.pop("config", None)
+
+
 def run_unit_tests():
     print_status("Running unit tests...")
     try:
@@ -182,7 +255,10 @@ def main():
         sys.exit(1)
         
     check_models()
-    
+
+    print("\n--- Phase 0: Local GGUF Model Inference Test ---")
+    gguf_ok = test_local_model_inference()
+
     print("\n--- Phase 1: Unit Tests ---")
     tests_ok = run_unit_tests()
     
@@ -190,13 +266,17 @@ def main():
     harness_ok = simulate_harness()
     
     print("\n" + "=" * 60)
-    if tests_ok and harness_ok:
+    if gguf_ok and tests_ok and harness_ok:
         print("\033[92mCONGRATULATIONS! Your local router setup is fully verified and clean.\033[0m")
         print("You are ready to build the Docker container and push to Docker Hub.")
         print("\nBuild command:")
         print("  docker build --platform linux/amd64 -t your_username/amd-ai-router:latest .")
     else:
-        print("\033[91mVERIFICATION FAILED. Please review the errors above and fix them before building.\033[0m")
+        if not gguf_ok:
+            print("\033[91mCRITICAL: Local GGUF model inference FAILED. Do NOT build the Docker image yet.\033[0m")
+            print("Fix the providers.py GGUF path resolution before proceeding.")
+        else:
+            print("\033[91mVERIFICATION FAILED. Please review the errors above and fix them before building.\033[0m")
     print("=" * 60)
 
 if __name__ == "__main__":

@@ -49,6 +49,8 @@ class Provider(Protocol):
 
 import os
 import asyncio
+import threading
+from pathlib import Path
 
 class LocalProvider:
     """Local model provider.
@@ -62,17 +64,38 @@ class LocalProvider:
         self.config = config
         self.name = "local"
         self.in_process_model = None
+        # threading.Lock serializes llama-cpp calls — the Llama object is NOT thread-safe.
+        # asyncio.gather() runs tasks concurrently via run_in_executor which spawns threads;
+        # without this lock, concurrent inference calls crash with GGML_ASSERT(buffer) failed.
+        self._llama_lock = threading.Lock()
 
-        # Check if the configured model is a local GGUF path
-        is_gguf = config.model.endswith(".gguf") or os.path.exists(config.model)
+        # Resolve model path: if config.model is overridden by ALLOWED_MODELS (e.g. accounts/fireworks/...)
+        # but the local GGUF file is baked into the image at models/gemma-2-2b-it-Q4_K_M.gguf,
+        # we must use the local GGUF file to guarantee local in-process execution.
+        model_path = config.model
+        default_gguf = "models/gemma-2-2b-it-Q4_K_M.gguf"
         
-        if is_gguf and os.path.exists(config.model):
-            logger.info("Initializing in-process Llama provider from %s", config.model)
+        if not os.path.exists(model_path):
+            # Check if default GGUF or any GGUF exists in models/
+            if os.path.exists(default_gguf):
+                model_path = default_gguf
+            else:
+                # Scan models/ directory for any GGUF file
+                models_dir = Path("models")
+                if models_dir.exists():
+                    gguf_files = list(models_dir.glob("*.gguf"))
+                    if gguf_files:
+                        model_path = str(gguf_files[0])
+
+        is_gguf = model_path.endswith(".gguf") or os.path.exists(model_path)
+        
+        if is_gguf and os.path.exists(model_path):
+            logger.info("Initializing in-process Llama provider from %s", model_path)
             try:
                 from llama_cpp import Llama
                 # Load the model with 4-bit quantization and CPU threads matching the 2 vCPU budget
                 self.in_process_model = Llama(
-                    model_path=config.model,
+                    model_path=model_path,
                     n_ctx=2048,
                     n_threads=2,
                     verbose=False
@@ -95,19 +118,31 @@ class LocalProvider:
             # Run in-process Llama inference in a threadpool to prevent blocking the event loop
             loop = asyncio.get_running_loop()
             
-            # Format using a standard prompt template for Gemma 2 IT
-            formatted_prompt = f"<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n"
+            # Format using the official Gemma 2 IT chat template.
+            # System instruction goes BEFORE the first user turn using a <start_of_turn>user block.
+            # This is the correct Gemma 2 format per official HuggingFace docs.
+            system_prompt = (
+                "You are a highly precise, direct, and concise assistant. "
+                "Provide answers directly without conversational preamble or verbose explanation. "
+                "For classification or extraction tasks, output ONLY the final answer (e.g. 'positive', 'negative', 'neutral')."
+            )
+            formatted_prompt = (
+                f"<start_of_turn>user\n{system_prompt}\n\n{prompt}<end_of_turn>\n"
+                f"<start_of_turn>model\n"
+            )
             
             def _inference():
-                return self.in_process_model(
-                    formatted_prompt,
-                    max_tokens=512,
-                    temperature=0.3,
-                    stop=["<end_of_turn>", "<start_of_turn>"],
-                )
+                # Acquire lock to prevent concurrent llama-cpp calls from crashing
+                with self._llama_lock:
+                    return self.in_process_model(
+                        formatted_prompt,
+                        max_tokens=512,
+                        temperature=0.1,
+                        stop=["<end_of_turn>", "<start_of_turn>"],
+                    )
                 
             response = await loop.run_in_executor(None, _inference)
-            content = response["choices"][0]["text"]
+            content = response["choices"][0]["text"].strip()
             
             prompt_tokens = response["usage"]["prompt_tokens"]
             completion_tokens = response["usage"]["completion_tokens"]

@@ -34,19 +34,24 @@ def mock_openai_client():
 
 @pytest.mark.asyncio
 async def test_local_provider_generate(mock_openai_client):
-    """Test LocalProvider generate method."""
+    """Test LocalProvider generate method uses HTTP path when no GGUF file is present."""
     cfg = ProviderConfig(base_url="http://localhost:1234/v1", model="local-model")
-    provider = LocalProvider(cfg)
-    
+
+    # Patch os.path.exists and Path.glob so GGUF auto-discovery finds nothing,
+    # forcing LocalProvider to use the HTTP/OpenAI client path (the mock).
+    with patch("providers.os.path.exists", return_value=False), \
+         patch("providers.Path.exists", return_value=False):
+        provider = LocalProvider(cfg)
+
     response = await provider.generate("Hello local")
-    
+
     assert isinstance(response, ProviderResponse)
     assert response.content == "Mocked provider response"
     assert response.prompt_tokens == 10
     assert response.completion_tokens == 20
     assert response.model == "local-model"
     assert response.provider == "local"
-    
+
     mock_openai_client.chat.completions.create.assert_called_once_with(
         model="local-model",
         messages=[{"role": "user", "content": "Hello local"}]

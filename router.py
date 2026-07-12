@@ -454,40 +454,57 @@ async def _semantic_route(
             category_thresholds=category_thresholds,
         )
 
-    # Category detection still runs so per-category thresholds apply
+    # Category detection runs so per-category thresholds apply
     _, _, category = analyze_prompt(prompt)
     effective_threshold = threshold
     if category_thresholds and category in category_thresholds:
         effective_threshold = category_thresholds[category]
 
-    logger.info(
-        "Semantic routing — score=%.2f threshold=%.2f category=%s",
-        score, effective_threshold, category,
+    # Ensemble semantic score with heuristic score to improve stability.
+    # Weight controlled by ENSEMBLE_ALPHA env var (0.0 → all heuristic, 1.0 → all semantic).
+    try:
+        from os import getenv
+        alpha = float(getenv("ENSEMBLE_ALPHA", "0.8"))
+    except Exception:
+        alpha = 0.8
+
+    heuristic_score, heuristic_reason, _ = analyze_prompt(prompt)
+    combined_score = alpha * score + (1.0 - alpha) * heuristic_score
+
+    combined_reason = (
+        f"ensembled semantic={score:.2f} (kNN) + heuristic={heuristic_score:.2f} -> combined={combined_score:.2f}; "
+        f"semantic_reason={reason}; heuristic_reason={heuristic_reason}"
     )
 
-    if score > effective_threshold:
-        logger.info("Semantic → REMOTE (score %.2f > %.2f)", score, effective_threshold)
+    logger.info(
+        "Semantic+Heuristic routing — combined_score=%.2f threshold=%.2f category=%s alpha=%.2f",
+        combined_score, effective_threshold, category, alpha,
+    )
+
+    # Decision uses the combined score
+    if combined_score > effective_threshold:
+        logger.info("Ensemble → REMOTE (combined %.2f > %.2f)", combined_score, effective_threshold)
         response = await remote_provider.generate(prompt)
         return RoutingResult(
             response=response,
             provider_used="remote",
             model_used=response.model,
-            routing_reason=reason,
-            complexity_score=score,
+            routing_reason=combined_reason,
+            complexity_score=combined_score,
             category=category,
             threshold_used=effective_threshold,
             fallback_used=False,
         )
 
-    logger.info("Semantic → LOCAL (score %.2f ≤ %.2f)", score, effective_threshold)
+    logger.info("Ensemble → LOCAL (combined %.2f ≤ %.2f)", combined_score, effective_threshold)
     try:
         response = await local_provider.generate(prompt)
         return RoutingResult(
             response=response,
             provider_used="local",
             model_used=response.model,
-            routing_reason=reason,
-            complexity_score=score,
+            routing_reason=combined_reason,
+            complexity_score=combined_score,
             category=category,
             threshold_used=effective_threshold,
             fallback_used=False,
@@ -495,14 +512,14 @@ async def _semantic_route(
     except Exception as local_error:
         if not fallback_enabled:
             raise
-        logger.warning("Local failed in semantic mode (%s) — escalating to remote.", local_error)
+        logger.warning("Local failed in semantic+heuristic mode (%s) — escalating to remote.", local_error)
         response = await remote_provider.generate(prompt)
         return RoutingResult(
             response=response,
             provider_used="remote",
             model_used=response.model,
             routing_reason=f"fallback (local failed: {local_error})",
-            complexity_score=score,
+            complexity_score=combined_score,
             category=category,
             threshold_used=effective_threshold,
             fallback_used=True,
@@ -572,17 +589,35 @@ async def _heuristic_route(
             "Routing to REMOTE (score %.2f > threshold %.2f, category=%s)",
             score, effective_threshold, category,
         )
-        response = await remote_provider.generate(prompt)
-        return RoutingResult(
-            response=response,
-            provider_used="remote",
-            model_used=response.model,
-            routing_reason=reason,
-            complexity_score=score,
-            category=category,
-            threshold_used=effective_threshold,
-            fallback_used=False,
-        )
+        try:
+            response = await remote_provider.generate(prompt)
+            return RoutingResult(
+                response=response,
+                provider_used="remote",
+                model_used=response.model,
+                routing_reason=reason,
+                complexity_score=score,
+                category=category,
+                threshold_used=effective_threshold,
+                fallback_used=False,
+            )
+        except Exception as remote_error:
+            if not fallback_enabled:
+                raise
+            logger.warning(
+                "Remote provider failed (%s) — falling back to LOCAL", remote_error
+            )
+            response = await local_provider.generate(prompt)
+            return RoutingResult(
+                response=response,
+                provider_used="local",
+                model_used=response.model,
+                routing_reason=f"fallback (remote failed: {remote_error})",
+                complexity_score=score,
+                category=category,
+                threshold_used=effective_threshold,
+                fallback_used=True,
+            )
 
     # --- Local path (simple request) ---
     logger.info(

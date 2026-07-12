@@ -8,14 +8,14 @@ local_provider:
 
 remote_provider:
   base_url: "https://api.fireworks.ai/inference/v1"
-  model: "gemma-4-31b"
+  model: "accounts/fireworks/models/gemma-4-31b-it"
   timeout: 60
 
 routing:
   threshold: 0.5           # Global fallback threshold
   max_remote_tokens: 4096
   fallback_enabled: true
-  strategy: heuristic        # Options: heuristic | semantic | gatekeeper (stub)
+  strategy: semantic        # Options: heuristic | semantic | gatekeeper (stub)
 
   # Per-category thresholds for the heuristic scorer.
   # Score range is 0.0 to 1.0 based on length, code, math, and reasoning signals.
@@ -25,7 +25,7 @@ routing:
     mathematics: 0.10        # Force mathematics to Remote (high accuracy)
     programming: 0.10        # Force programming/code to Remote (high accuracy)
     logical_reasoning: 0.10  # Force logical reasoning to Remote (high accuracy)
-    summarization: 0.55      # Keep summarisation Local (cost-effective)
+    summarization: 0.10      # Route summarisation to Remote for accuracy-sensitive tasks
     classification: 0.55     # Keep classification/sentiment Local (cost-effective)
     ner: 0.55                # Keep NER Local (cost-effective)
     general: 0.40            # Midpoint for general queries

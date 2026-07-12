@@ -16,7 +16,7 @@ from openai import AsyncOpenAI
 from config import ProviderConfig
 
 try:
-    from fireworks import AsyncFireworks
+    from openai import AsyncOpenAI
     FIREWORKS_SDK_AVAILABLE = True
 except ImportError:
     FIREWORKS_SDK_AVAILABLE = False
@@ -194,7 +194,7 @@ class RemoteProvider:
                 "Install the fireworks package in your environment."
             )
 
-        logger.info("Initializing Fireworks SDK remote provider.")
+        logger.info("Initializing OpenAI-compatible Fireworks remote provider.")
         fireworks_kwargs = {}
         if config.api_key:
             fireworks_kwargs["api_key"] = config.api_key
@@ -202,10 +202,9 @@ class RemoteProvider:
             fireworks_kwargs["base_url"] = config.base_url
 
         try:
-            self.client = AsyncFireworks(**fireworks_kwargs)
+            self.client = AsyncOpenAI(**fireworks_kwargs)
         except TypeError:
-            # Some Fireworks SDK versions may not accept explicit args.
-            self.client = AsyncFireworks()
+            self.client = AsyncOpenAI()
 
     async def generate(self, prompt: str, **kwargs: Any) -> ProviderResponse:
         """Send prompt to the remote model."""

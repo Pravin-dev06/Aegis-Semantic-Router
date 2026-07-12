@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -60,8 +60,8 @@ async def test_local_provider_generate(mock_openai_client):
 
 @pytest.fixture
 def mock_fireworks_client():
-    """Fixture to mock AsyncFireworks client for RemoteProvider."""
-    with patch("providers.AsyncFireworks") as mock:
+    """Fixture to mock the OpenAI-compatible remote client for RemoteProvider."""
+    with patch("providers.AsyncOpenAI") as mock:
         client_instance = AsyncMock()
         mock_response = AsyncMock()
         mock_response.choices = [AsyncMock()]
@@ -77,7 +77,7 @@ def mock_fireworks_client():
 
 @pytest.mark.asyncio
 async def test_remote_provider_generate(mock_fireworks_client):
-    """Test RemoteProvider generate method with AsyncFireworks."""
+    """Test RemoteProvider generate method with the OpenAI-compatible client."""
     cfg = ProviderConfig(
         base_url="https://api.fireworks.ai/inference/v1",
         model="remote-model",
@@ -104,7 +104,7 @@ async def test_remote_provider_generate(mock_fireworks_client):
 def test_remote_provider_missing_key(caplog):
     """Test that a warning is logged when API key is missing for RemoteProvider."""
     cfg = ProviderConfig(base_url="https://api.fireworks.ai/inference/v1", model="test")
-    with patch("providers.AsyncFireworks"):
+    with patch("providers.AsyncOpenAI"):
         provider = RemoteProvider(cfg)
     
     assert "without an API key" in caplog.text

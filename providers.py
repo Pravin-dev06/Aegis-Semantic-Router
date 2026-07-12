@@ -112,16 +112,23 @@ class LocalProvider:
             except Exception as e:
                 logger.error("Failed to load in-process Llama provider: %s. Falling back to HTTP client.", e)
         
+        self.client = None
         if self.in_process_model is None:
-            self.client = AsyncOpenAI(
-                base_url=config.base_url,
-                api_key=config.api_key or "not-needed",
-                timeout=config.timeout,
-            )
-            logger.info("LocalProvider (HTTP API) initialized: model=%s @ %s", config.model, config.base_url)
+            try:
+                self.client = AsyncOpenAI(
+                    base_url=config.base_url,
+                    api_key=config.api_key or "not-needed",
+                    timeout=config.timeout,
+                )
+                logger.info("LocalProvider (HTTP API) initialized: model=%s @ %s", config.model, config.base_url)
+            except Exception as exc:
+                logger.warning("Failed to initialize local provider client: %s", exc)
 
     async def generate(self, prompt: str, **kwargs: Any) -> ProviderResponse:
         """Send prompt to the local model."""
+        if self.client is None and self.in_process_model is None:
+            raise RuntimeError("Local provider client is unavailable")
+
         if self.in_process_model is not None:
             # Run in-process Llama inference in a threadpool to prevent blocking the event loop
             loop = asyncio.get_running_loop()
@@ -129,8 +136,10 @@ class LocalProvider:
             # Format using the official Qwen 2.5 ChatML chat template.
             system_prompt = (
                 "You are a highly precise, direct, and concise assistant. "
-                "Provide answers directly without conversational preamble or verbose explanation. "
-                "For classification or extraction tasks, output ONLY the final answer (e.g. 'positive', 'negative', 'neutral')."
+                "Answer with the minimum text needed. "
+                "For factual questions, output only the final answer. "
+                "For classification tasks, output only the label. "
+                "For simple code tasks, output only the code snippet."
             )
             formatted_prompt = (
                 f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
@@ -164,6 +173,8 @@ class LocalProvider:
         else:
             messages = [{"role": "user", "content": prompt}]
             call_kwargs = {**kwargs, "model": self.config.model, "messages": messages}
+            if "max_tokens" in call_kwargs:
+                call_kwargs["max_tokens"] = min(call_kwargs["max_tokens"], 128)
             response = await self.client.chat.completions.create(**call_kwargs)
             
             content = response.choices[0].message.content or ""
@@ -203,13 +214,19 @@ class RemoteProvider:
 
         try:
             self.client = AsyncOpenAI(**fireworks_kwargs)
-        except TypeError:
-            self.client = AsyncOpenAI()
+        except Exception as exc:
+            logger.warning("Failed to initialize remote provider client: %s", exc)
+            self.client = None
 
     async def generate(self, prompt: str, **kwargs: Any) -> ProviderResponse:
         """Send prompt to the remote model."""
+        if self.client is None:
+            raise RuntimeError("Remote provider client is unavailable")
+
         messages = [{"role": "user", "content": prompt}]
         call_kwargs = {**kwargs, "model": self.config.model, "messages": messages}
+        if "max_tokens" in call_kwargs:
+            call_kwargs["max_tokens"] = min(call_kwargs["max_tokens"], 256)
 
         response = await self.client.chat.completions.create(**call_kwargs)
 

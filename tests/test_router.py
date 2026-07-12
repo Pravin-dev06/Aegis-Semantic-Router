@@ -227,6 +227,38 @@ class TestRoutingStrategies:
     """Test strategy dispatcher and semantic routing logic (model is mocked)."""
 
     @pytest.mark.asyncio
+    async def test_mathematics_prompt_routes_remote_by_category(self):
+        local = _make_mock_provider("local")
+        remote = _make_mock_provider("remote")
+
+        result = await route(
+            "Solve for x: 3x + 9 = 27",
+            local_provider=local,
+            remote_provider=remote,
+            threshold=0.5,
+        )
+
+        assert result.provider_used == "remote"
+        remote.generate.assert_called_once()
+        local.generate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_classification_prompt_stays_local_by_category(self):
+        local = _make_mock_provider("local")
+        remote = _make_mock_provider("remote")
+
+        result = await route(
+            "Classify the sentiment: this product is amazing and worth buying.",
+            local_provider=local,
+            remote_provider=remote,
+            threshold=0.5,
+        )
+
+        assert result.provider_used == "local"
+        local.generate.assert_called_once()
+        remote.generate.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_semantic_strategy_routes_local_when_score_low(self):
         """Semantic strategy sends low-complexity prompt to local provider."""
         local = _make_mock_provider("local")

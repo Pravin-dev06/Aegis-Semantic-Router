@@ -91,7 +91,8 @@ _MATH_CATEGORY = re.compile(
 )
 _CODE_CATEGORY = re.compile(
     r"\b(function|class|program|code|algorithm|implement|implementation|"
-    r"script|debug|debugging|recursion|loop|array|string|bug|fix)\b|```",
+    r"script|debug|debugging|recursion|loop|array|string|bug|fix|python|javascript|"
+    r"java|typescript|sql|c\+\+|rust|go|binary search|tree|cache|decorator|lru)\b|```",
     re.IGNORECASE,
 )
 _CLASSIFICATION_CATEGORY = re.compile(
@@ -193,6 +194,41 @@ def analyze_prompt(prompt: str) -> tuple[float, str, str]:
         category = "general"
 
     return score, reason, category
+
+
+def _should_route_remote(prompt: str, score: float, category: str, effective_threshold: float) -> bool:
+    """Choose a cost-aware routing decision for a prompt category.
+
+    The router keeps simple factual and classification prompts on the local model,
+    while sending math, code, and logic-heavy requests to the remote model.
+    """
+    prompt_lower = prompt.strip().lower()
+
+    if category in {"programming", "logical_reasoning"}:
+        return True
+
+    if category == "mathematics":
+        math_keywords = (
+            "solve", "equation", "integral", "derivative", "matrix",
+            "probability", "factorial", "theorem", "proof", "system",
+            "calculate", "sum of", "average", "percent", "compound"
+        )
+        return any(keyword in prompt_lower for keyword in math_keywords) or len(prompt) > 45
+
+    if category in {"classification", "ner"}:
+        return False
+
+    if category == "summarization":
+        if any(word in prompt_lower for word in ("executive", "technical", "contract", "report", "paper", "abstract", "bullet", "paragraph", "structured", "detailed", "detailed")):
+            return True
+        return score > max(effective_threshold, 0.6)
+
+    if category == "general":
+        if len(prompt) > 180 or any(word in prompt_lower for word in ("explain", "compare", "analyze", "why", "how", "step", "solve", "calculate")):
+            return score > max(effective_threshold, 0.35)
+        return False
+
+    return score > effective_threshold
 
 
 # ---------------------------------------------------------------------------
@@ -481,10 +517,12 @@ async def _semantic_route(
         combined_score, effective_threshold, category, alpha,
     )
 
-    # Decision uses the combined score
-    if combined_score > effective_threshold:
-        logger.info("Ensemble → REMOTE (combined %.2f > %.2f)", combined_score, effective_threshold)
-        response = await remote_provider.generate(prompt)
+    # Decision uses the combined score, but category-aware checks keep cheap local
+    # routing for simple prompts and reserve remote calls for harder tasks.
+    should_remote = _should_route_remote(prompt, combined_score, category, effective_threshold)
+    if should_remote:
+        logger.info("Ensemble → REMOTE (category=%s combined %.2f > threshold %.2f)", category, combined_score, effective_threshold)
+        response = await remote_provider.generate(prompt, max_tokens=256)
         return RoutingResult(
             response=response,
             provider_used="remote",
@@ -496,9 +534,9 @@ async def _semantic_route(
             fallback_used=False,
         )
 
-    logger.info("Ensemble → LOCAL (combined %.2f ≤ %.2f)", combined_score, effective_threshold)
+    logger.info("Ensemble → LOCAL (category=%s combined %.2f ≤ threshold %.2f)", category, combined_score, effective_threshold)
     try:
-        response = await local_provider.generate(prompt)
+        response = await local_provider.generate(prompt, max_tokens=128)
         return RoutingResult(
             response=response,
             provider_used="local",
@@ -584,13 +622,14 @@ async def _heuristic_route(
     )
 
     # --- Remote path (complex request) ---
-    if score > effective_threshold:
+    should_remote = _should_route_remote(prompt, score, category, effective_threshold)
+    if should_remote:
         logger.info(
-            "Routing to REMOTE (score %.2f > threshold %.2f, category=%s)",
+            "Routing to REMOTE (score %.2f threshold %.2f, category=%s)",
             score, effective_threshold, category,
         )
         try:
-            response = await remote_provider.generate(prompt)
+            response = await remote_provider.generate(prompt, max_tokens=256)
             return RoutingResult(
                 response=response,
                 provider_used="remote",
@@ -625,7 +664,7 @@ async def _heuristic_route(
         score, effective_threshold, category,
     )
     try:
-        response = await local_provider.generate(prompt)
+        response = await local_provider.generate(prompt, max_tokens=128)
         return RoutingResult(
             response=response,
             provider_used="local",

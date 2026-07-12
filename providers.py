@@ -1,17 +1,25 @@
 """Provider interface and implementations.
 
-Defines the Provider protocol that all providers must implement,
-and standardizes inference using AsyncOpenAI.
+Defines the Provider protocol that all providers must implement.
+LocalProvider can use llama-cpp for in-process inference.
+RemoteProvider uses the official Fireworks async SDK for external calls.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from openai import AsyncOpenAI
 from config import ProviderConfig
+
+try:
+    from fireworks import AsyncFireworks
+    FIREWORKS_SDK_AVAILABLE = True
+except ImportError:
+    FIREWORKS_SDK_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -179,26 +187,37 @@ class RemoteProvider:
         self.name = "remote"
         if not config.api_key:
             logger.warning("RemoteProvider initialized without an API key!")
-            
-        self.client = AsyncOpenAI(
-            base_url=config.base_url,
-            api_key=config.api_key or "missing-api-key",
-            timeout=config.timeout,
-        )
-        logger.info("RemoteProvider initialized: model=%s", config.model)
+
+        if not FIREWORKS_SDK_AVAILABLE:
+            raise RuntimeError(
+                "Fireworks SDK is required for RemoteProvider. "
+                "Install the fireworks package in your environment."
+            )
+
+        logger.info("Initializing Fireworks SDK remote provider.")
+        fireworks_kwargs = {}
+        if config.api_key:
+            fireworks_kwargs["api_key"] = config.api_key
+        if config.base_url:
+            fireworks_kwargs["base_url"] = config.base_url
+
+        try:
+            self.client = AsyncFireworks(**fireworks_kwargs)
+        except TypeError:
+            # Some Fireworks SDK versions may not accept explicit args.
+            self.client = AsyncFireworks()
 
     async def generate(self, prompt: str, **kwargs: Any) -> ProviderResponse:
         """Send prompt to the remote model."""
         messages = [{"role": "user", "content": prompt}]
-        
         call_kwargs = {**kwargs, "model": self.config.model, "messages": messages}
-        
+
         response = await self.client.chat.completions.create(**call_kwargs)
-        
+
         content = response.choices[0].message.content or ""
         prompt_tokens = response.usage.prompt_tokens if response.usage else 0
         completion_tokens = response.usage.completion_tokens if response.usage else 0
-        
+
         return ProviderResponse(
             content=content,
             prompt_tokens=prompt_tokens,
@@ -206,3 +225,4 @@ class RemoteProvider:
             model=self.config.model,
             provider=self.name,
         )
+

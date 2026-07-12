@@ -1,4 +1,4 @@
-"""Tests for the provider implementations using AsyncOpenAI."""
+"""Tests for the provider implementations using AsyncOpenAI and AsyncFireworks."""
 
 import sys
 from pathlib import Path
@@ -15,11 +15,11 @@ from providers import LocalProvider, RemoteProvider, ProviderResponse
 
 @pytest.fixture
 def mock_openai_client():
-    """Fixture to mock AsyncOpenAI client."""
+    """Fixture to mock AsyncOpenAI client for LocalProvider fallback."""
     with patch("providers.AsyncOpenAI") as mock:
         client_instance = AsyncMock()
         
-        # Setup mock response structure
+        # Setup mock response structure for OpenAI-compatible HTTP fallback
         mock_response = AsyncMock()
         mock_response.choices = [AsyncMock()]
         mock_response.choices[0].message.content = "Mocked provider response"
@@ -58,9 +58,26 @@ async def test_local_provider_generate(mock_openai_client):
     )
 
 
+@pytest.fixture
+def mock_fireworks_client():
+    """Fixture to mock AsyncFireworks client for RemoteProvider."""
+    with patch("providers.AsyncFireworks") as mock:
+        client_instance = AsyncMock()
+        mock_response = AsyncMock()
+        mock_response.choices = [AsyncMock()]
+        mock_response.choices[0].message.content = "Mocked provider response"
+        mock_response.usage.prompt_tokens = 10
+        mock_response.usage.completion_tokens = 20
+
+        client_instance.chat.completions.create.return_value = mock_response
+        mock.return_value = client_instance
+
+        yield client_instance
+
+
 @pytest.mark.asyncio
-async def test_remote_provider_generate(mock_openai_client):
-    """Test RemoteProvider generate method."""
+async def test_remote_provider_generate(mock_fireworks_client):
+    """Test RemoteProvider generate method with AsyncFireworks."""
     cfg = ProviderConfig(
         base_url="https://api.fireworks.ai/inference/v1",
         model="remote-model",
@@ -77,7 +94,7 @@ async def test_remote_provider_generate(mock_openai_client):
     assert response.model == "remote-model"
     assert response.provider == "remote"
     
-    mock_openai_client.chat.completions.create.assert_called_once_with(
+    mock_fireworks_client.chat.completions.create.assert_called_once_with(
         model="remote-model",
         messages=[{"role": "user", "content": "Hello remote"}],
         temperature=0.7
@@ -87,6 +104,7 @@ async def test_remote_provider_generate(mock_openai_client):
 def test_remote_provider_missing_key(caplog):
     """Test that a warning is logged when API key is missing for RemoteProvider."""
     cfg = ProviderConfig(base_url="https://api.fireworks.ai/inference/v1", model="test")
-    provider = RemoteProvider(cfg)
+    with patch("providers.AsyncFireworks"):
+        provider = RemoteProvider(cfg)
     
     assert "without an API key" in caplog.text
